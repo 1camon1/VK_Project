@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ORGANIZER
+  PARTICIPANT
+}
+
+enum QuestionType {
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+}
+
+enum RoomStatus {
+  WAITING
+  ACTIVE
+  FINISHED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(PARTICIPANT)
+  createdAt    DateTime @default(now())
+
+  quizzes        Quiz[]
+  participations RoomParticipant[]
+}
+
+model Quiz {
+  id              String   @id @default(cuid())
+  title           String
+  description     String?
+  category        String?
+  timePerQuestion Int      @default(20)
+  createdAt       DateTime @default(now())
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  questions Question[]
+  rooms     Room[]
+}
+
+model Question {
+  id        String       @id @default(cuid())
+  text      String
+  imageUrl  String?
+  type      QuestionType @default(SINGLE_CHOICE)
+  timeLimit Int          @default(20)
+  points    Int          @default(100)
+  order     Int
+
+  quizId String
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  options AnswerOption[]
+  answers ParticipantAnswer[]
+}
+
+model AnswerOption {
+  id        String  @id @default(cuid())
+  text      String
+  isCorrect Boolean @default(false)
+
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+model Room {
+  id                   String     @id @default(cuid())
+  code                 String     @unique
+  status               RoomStatus @default(WAITING)
+  currentQuestionIndex Int        @default(0)
+  startedAt            DateTime?
+  finishedAt           DateTime?
+
+  quizId String
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  participants RoomParticipant[]
+}
+
+model RoomParticipant {
+  id       String   @id @default(cuid())
+  nickname String
+  score    Int      @default(0)
+  joinedAt DateTime @default(now())
+
+  roomId String
+  room   Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  answers ParticipantAnswer[]
+}
+
+model ParticipantAnswer {
+  id                String   @id @default(cuid())
+  selectedOptionIds String
+  isCorrect         Boolean  @default(false)
+  earnedPoints      Int      @default(0)
+  answeredAt        DateTime @default(now())
+
+  participantId String
+  participant   RoomParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([participantId, questionId])
+}
